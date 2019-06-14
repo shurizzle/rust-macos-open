@@ -1,4 +1,5 @@
-//! Cose
+//! A simple way to use /usr/bin/open features in the programmatically way.
+//! This is a wrapper around Core Foundation, Launch Services and File Metadata frameworks.
 
 extern crate core_foundation;
 extern crate core_foundation_sys;
@@ -40,8 +41,9 @@ extern "C" {
     ) -> CFURLRef;
 }
 
-/// Trait
+/// A type implementing this trait can may be transformed in a CFURL and so opened.
 pub trait Openable {
+    /// Transform this type in a CFURL (Core Foundation URL).
     fn into_openable(&self) -> Option<CFURL>;
 }
 
@@ -110,8 +112,9 @@ impl Openable for PathBuf {
     }
 }
 
-/// Trait
+/// A type implementing this trait can may be transformed in a CFArray<CFURL> and so opened.
 pub trait MultiOpenable {
+    /// Transform this type in a CFArray (Core Foundation array) of CFURL (Core Foundation URL).
     fn into_openable(&self) -> Option<CFArray<CFURL>>;
 }
 
@@ -191,6 +194,7 @@ def_multiopenable_vec!(&PathBuf);
 def_multiopenable_type!(Path);
 def_multiopenable!(PathBuf);
 
+/// Open an Openable value with default handler
 pub fn open<T: Openable + ?Sized>(url: &T) -> Result<Option<PathBuf>> {
     if let Some(openable) = Openable::into_openable(url) {
         match open_url(&openable) {
@@ -234,6 +238,8 @@ fn remap_multiopenable<T: MultiOpenable + ?Sized>(
     }
 }
 
+/// Open the app if no urls provided, open the urls in app if both provided and open urls in
+/// default handlers if no app is provided.
 pub fn open_complex<T: MultiOpenable + ?Sized>(
     app: Option<&Path>,
     urls: Option<&T>,
@@ -255,14 +261,7 @@ pub fn open_complex<T: MultiOpenable + ?Sized>(
     }
 }
 
-pub fn default_app_for_scheme(scheme: &str) -> Option<PathBuf> {
-    let scheme = Openable::into_openable(&format!("{}://", scheme))?;
-    match default_application_url_for_url(&scheme, LSRolesMask::VIEWER) {
-        Ok(url) => url.to_path(),
-        Err(_) => None,
-    }
-}
-
+/// Get all the app that can handle the given scheme
 pub fn apps_for_scheme(scheme: &str) -> Option<Vec<PathBuf>> {
     let scheme = Openable::into_openable(&format!("{}://", scheme))?;
     Some(
@@ -273,6 +272,16 @@ pub fn apps_for_scheme(scheme: &str) -> Option<Vec<PathBuf>> {
     )
 }
 
+/// Get the default app handler for defined scheme
+pub fn app_for_scheme(scheme: &str) -> Option<PathBuf> {
+    let scheme = Openable::into_openable(&format!("{}://", scheme))?;
+    match default_application_url_for_url(&scheme, LSRolesMask::VIEWER) {
+        Ok(url) => url.to_path(),
+        Err(_) => None,
+    }
+}
+
+/// Get all the app's paths matching the given bundle identifier
 pub fn apps_for_bundle_id(bundle_id: &str) -> Option<Vec<PathBuf>> {
     let bundle_id = CFString::new(bundle_id);
     match application_urls_for_bundle_identifier(&bundle_id) {
@@ -281,6 +290,7 @@ pub fn apps_for_bundle_id(bundle_id: &str) -> Option<Vec<PathBuf>> {
     }
 }
 
+/// Get first app's paths matching the given bundle identifier
 pub fn app_for_bundle_id(bundle_id: &str) -> Option<PathBuf> {
     let mut apps = apps_for_bundle_id(bundle_id)?;
     if apps.is_empty() {
@@ -292,6 +302,7 @@ pub fn app_for_bundle_id(bundle_id: &str) -> Option<PathBuf> {
 
 const MQ_STRING_SPECIAL_CHARS: [char; 4] = ['?', '*', '\\', '"'];
 
+/// Get all the app's paths matching the given name in current locale
 pub fn apps_for_name(app_name: &str) -> Option<Vec<PathBuf>> {
     let mut query_string = String::new();
     let escaper: Escaper<&[char]> = Escaper::new('\\', &MQ_STRING_SPECIAL_CHARS);
@@ -321,6 +332,7 @@ pub fn apps_for_name(app_name: &str) -> Option<Vec<PathBuf>> {
     }
 }
 
+/// Get first app's paths matching the given name in current locale
 pub fn app_for_name(name: &str) -> Option<PathBuf> {
     let mut apps = apps_for_name(name)?;
     if apps.is_empty() {
@@ -330,6 +342,7 @@ pub fn app_for_name(name: &str) -> Option<PathBuf> {
     }
 }
 
+/// Check if the app can handle all the given urls
 pub fn app_accept_urls<T: MultiOpenable + ?Sized>(app: &Path, urls: &T) -> bool {
     if let Some(app) = CFURL::from_path(app, true) {
         match MultiOpenable::into_openable(urls) {
@@ -354,6 +367,7 @@ pub fn app_accept_urls<T: MultiOpenable + ?Sized>(app: &Path, urls: &T) -> bool 
     }
 }
 
+/// Get all the apps matching the name in current locale that can open the given urls
 pub fn apps_for_name_accepting_urls<T: MultiOpenable + ?Sized>(
     name: &str,
     urls: &T,
@@ -370,6 +384,7 @@ pub fn apps_for_name_accepting_urls<T: MultiOpenable + ?Sized>(
     }
 }
 
+/// Get the first app matching the name in current locale that can open the given urls
 pub fn app_for_name_accepting_urls<T: MultiOpenable + ?Sized>(
     name: &str,
     urls: &T,
@@ -383,6 +398,7 @@ pub fn app_for_name_accepting_urls<T: MultiOpenable + ?Sized>(
     }
 }
 
+/// Get all the apps matching the bundle identifier that can open the given urls
 pub fn apps_for_bundle_id_accepting_urls<T: MultiOpenable + ?Sized>(
     bundle_id: &str,
     urls: &T,
@@ -399,6 +415,7 @@ pub fn apps_for_bundle_id_accepting_urls<T: MultiOpenable + ?Sized>(
     }
 }
 
+/// Get the first app matching the bundle identifier that can open the given urls
 pub fn app_for_bundle_id_accepting_urls<T: MultiOpenable + ?Sized>(
     bundle_id: &str,
     urls: &T,
