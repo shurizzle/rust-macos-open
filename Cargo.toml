@@ -1,6 +1,6 @@
 [package]
 name = "macos-open"
-version = "0.0.1"
+version = "0.0.2"
 description = "A clone of macOS /usr/bin/open, in the programmatically way."
 homepage = "https://github.com/shurizzle/rust-macos-open"
 repository = "https://github.com/shurizzle/rust-macos-open"
