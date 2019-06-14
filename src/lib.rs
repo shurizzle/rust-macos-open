@@ -8,6 +8,7 @@ extern crate fast_escape;
 extern crate fast_fmt;
 extern crate launch_services;
 extern crate void;
+extern crate url;
 
 use core_foundation::array::CFArray;
 use core_foundation::base::TCFType;
@@ -32,6 +33,8 @@ use file_metadata::mditem::attributes;
 use file_metadata::mdquery::{MDQuery, MDQueryOptionFlags};
 use void::ResultVoidExt;
 
+use url::{Url, ParseError};
+
 #[link(name = "CoreServices", kind = "framework")]
 extern "C" {
     fn CFURLCreateWithString(
@@ -48,7 +51,23 @@ pub trait Openable {
 }
 
 fn url(value: &str) -> Option<CFURL> {
+    match Url::parse(value) {
+        Ok(u) => _url(&u.into_string()),
+        Err(ParseError::RelativeUrlWithoutBase) => {
+            let path = Path::new(value);
+            if path.exists() {
+                Openable::into_openable(&path)
+            } else {
+                _url(value)
+            }
+        },
+        Err(_) => _url(value),
+    }
+}
+
+fn _url(value: &str) -> Option<CFURL> {
     let url = CFString::new(value);
+
     let ptr = unsafe {
         CFURLCreateWithString(
             kCFAllocatorDefault,
@@ -90,25 +109,53 @@ impl Openable for String {
 
 impl Openable for &Path {
     fn into_openable(&self) -> Option<CFURL> {
-        Openable::into_openable(self.to_str()?)
+        if self.is_relative() {
+            match self.canonicalize() {
+                Ok(path) => Openable::into_openable(&path),
+                Err(_) => None,
+            }
+        } else {
+            CFURL::from_path(self, self.is_dir())
+        }
     }
 }
 
 impl Openable for Path {
     fn into_openable(&self) -> Option<CFURL> {
-        Openable::into_openable(self.to_str()?)
+        if self.is_relative() {
+            match self.canonicalize() {
+                Ok(path) => Openable::into_openable(&path),
+                Err(_) => None,
+            }
+        } else {
+            CFURL::from_path(self, self.is_dir())
+        }
     }
 }
 
 impl Openable for &PathBuf {
     fn into_openable(&self) -> Option<CFURL> {
-        Openable::into_openable(self.to_str()?)
+        if self.is_relative() {
+            match self.canonicalize() {
+                Ok(path) => Openable::into_openable(&path),
+                Err(_) => None,
+            }
+        } else {
+            CFURL::from_path(self, self.is_dir())
+        }
     }
 }
 
 impl Openable for PathBuf {
     fn into_openable(&self) -> Option<CFURL> {
-        Openable::into_openable(self.to_str()?)
+        if self.is_relative() {
+            match self.canonicalize() {
+                Ok(path) => Openable::into_openable(&path),
+                Err(_) => None,
+            }
+        } else {
+            CFURL::from_path(self, self.is_dir())
+        }
     }
 }
 
@@ -434,26 +481,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-        open("https://www.google.com/").unwrap();
+    fn test_open_default() {
+        assert!(open("https://www.google.com/").is_ok());
+    }
 
-        open_complex(
+    #[test]
+    fn test_open_default_non_ascii() {
+        assert!(open("http://github.com?dummy_query1=0&dummy_query2=ｎｏｎａｓｃｉｉ").is_ok());
+    }
+
+    #[test]
+    fn test_open_complex_safari() {
+        assert!(open_complex(
             Some(Path::new("/Applications/Safari.app")),
             Some(&["https://news.ycombinator.com/", "https://www.google.com/"][..]),
             LSLaunchFlags::DEFAULTS,
-        )
-        .unwrap();
+        ).is_ok());
+    }
 
-        println!("{:#?}", apps_for_bundle_id("com.google.chrome"));
-        println!("{:#?}", app_for_bundle_id("com.google.chrome"));
+    #[test]
+    fn test_get_safari_by_bundle_id() {
+        assert!(apps_for_bundle_id("com.apple.safari").is_some());
+        assert!(app_for_bundle_id("com.apple.safari").is_some());
+    }
 
-        println!(
-            "{:#?}",
-            app_for_name_accepting_urls("Google Chrome", &["http://www.google.com/"][..])
-        );
-        println!(
-            "{:#?}",
-            app_for_bundle_id_accepting_urls("com.google.chrome", &["http://www.google.com/"][..])
-        );
+    #[test]
+    fn test_get_safari_by_name_accepting_google_url() {
+        assert!(app_for_name_accepting_urls("Safari", &["http://www.google.com/"][..]).is_some());
+    }
+
+    #[test]
+    fn test_get_safari_by_bundle_id_accepting_google_url() {
+        assert!(app_for_bundle_id_accepting_urls("com.google.chrome", &["http://www.google.com/"][..]).is_some());
     }
 }
