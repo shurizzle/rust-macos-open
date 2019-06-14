@@ -1,0 +1,18 @@
+[package]
+name = "macos-open"
+version = "0.0.1"
+description = "A clone of macOS /usr/bin/open, in the programmatically way."
+homepage = "https://github.com/shurizzle/rust-macos-open"
+repository = "https://github.com/shurizzle/rust-macos-open"
+license-file = "LICENSE"
+authors = ["Domenico Shura <shura1991@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+core-foundation-sys = "0.6.2"
+core-foundation = "0.6.4"
+launch-services = "0.0.2"
+file-metadata = "0.0.2"
+fast_fmt = "0.1.3"
+fast_escape = "0.1.0"
+void = "1.0.2"
