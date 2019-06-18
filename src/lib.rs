@@ -394,7 +394,7 @@ pub fn app_accept_url<T: Openable + ?Sized>(app: &Path, url: &T) -> bool {
     if let Some(app) = CFURL::from_path(app, true) {
         match Openable::into_openable(url) {
             None => return false,
-            Some(url) => match can_url_accept_url(url, &app, LSRolesMask::VIEWER, LSAcceptanceFlags::DEFAULT) {
+            Some(url) => match can_url_accept_url(&url, &app, LSRolesMask::VIEWER, LSAcceptanceFlags::DEFAULT) {
                 Err(_) => false,
                 Ok(res) => res
             },
